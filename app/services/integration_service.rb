@@ -11,6 +11,8 @@ class IntegrationService
     case @integration_type
     when 'slack'
       process_slack_command(command, context)
+    when 'slack_thread'
+      process_slack_thread_command(command, context)
     when 'github'
       process_github_command(command, context)
     when 'gmail'
@@ -31,6 +33,47 @@ class IntegrationService
       AiAgentService.new(agent_type).execute(input_data, @user.id)
     else
       { error: "Could not determine agent type from command: #{command}" }
+    end
+  end
+  
+  def process_slack_thread_command(command, context)
+    # Process Slack thread mentions with full thread context
+    slack_thread_service = SlackThreadService.new(@user)
+    thread_data = slack_thread_service.process_thread_mention(context)
+    
+    # Extract agent instructions from the thread
+    instructions = thread_data[:agent_instructions]
+    
+    if instructions.any?
+      # Process each instruction found in the thread
+      results = instructions.map do |instruction|
+        agent_type = extract_agent_type(instruction[:instruction])
+        if agent_type
+          input_data = {
+            command: instruction[:instruction],
+            context: thread_data,
+            user_id: @user.id,
+            timestamp: instruction[:timestamp],
+            thread_context: thread_data[:summary],
+            participants: thread_data[:context][:participants]
+          }
+          
+          AiAgentService.new(agent_type).execute(input_data, @user.id)
+        else
+          { error: "Could not determine agent type from thread instruction: #{instruction[:instruction]}" }
+        end
+      end
+      
+      # Post a summary response back to the thread
+      post_thread_summary(thread_data, results)
+      
+      { 
+        message: "Processed #{instructions.length} instructions from thread",
+        results: results,
+        thread_summary: thread_data[:summary]
+      }
+    else
+      { error: "No actionable instructions found in thread" }
     end
   end
   
@@ -142,5 +185,41 @@ class IntegrationService
       user_id: @user.id,
       timestamp: Time.current
     }
+  end
+  
+  def post_thread_summary(thread_data, results)
+    # Post a summary of agent actions back to the Slack thread
+    slack_thread_service = SlackThreadService.new(@user)
+    
+    summary_text = build_thread_summary_text(results)
+    
+    slack_thread_service.post_thread_response(
+      thread_data[:channel],
+      thread_data[:thread_ts],
+      summary_text
+    )
+  end
+  
+  def build_thread_summary_text(results)
+    successful_results = results.select { |r| !r.is_a?(Hash) || !r[:error] }
+    error_results = results.select { |r| r.is_a?(Hash) && r[:error] }
+    
+    text = "🤖 **@roadie processed your thread request:**\n\n"
+    
+    if successful_results.any?
+      text += "✅ **Completed actions:**\n"
+      successful_results.each_with_index do |result, index|
+        text += "#{index + 1}. #{result}\n"
+      end
+    end
+    
+    if error_results.any?
+      text += "\n❌ **Issues encountered:**\n"
+      error_results.each_with_index do |result, index|
+        text += "#{index + 1}. #{result[:error]}\n"
+      end
+    end
+    
+    text
   end
 end

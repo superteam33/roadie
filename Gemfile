@@ -30,6 +30,9 @@ gem "redis"
 # HTTP client for AI integrations
 gem "httparty"
 
+# Slack API client
+gem "slack-ruby-client"
+
 # Environment variables
 gem "dotenv-rails"
 

@@ -31,6 +31,10 @@ Rails.application.routes.draw do
       post 'integrations/github', to: 'integrations#github'
       post 'integrations/gmail', to: 'integrations#gmail'
       post 'integrations/webhook', to: 'integrations#webhook'
+      
+      # Slack Webhooks
+      post 'slack/events', to: 'slack_webhook#events'
+      post 'slack/interactive', to: 'slack_webhook#interactive'
     end
   end
 

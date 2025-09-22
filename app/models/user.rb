@@ -9,6 +9,9 @@ class User < ApplicationRecord
   validates :email, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :role, presence: true, inclusion: { in: %w[admin pm developer student] }
   
+  # Slack integration fields
+  validates :slack_user_id, uniqueness: true, allow_nil: true
+  
   enum :role, { admin: 'admin', pm: 'pm', developer: 'developer', student: 'student' }
   
   def integration_tokens
