@@ -112,6 +112,8 @@ class IntegrationService
       'roadmap_creator'
     when /status|update|progress/
       'status_updater'
+    when /help.*roadmap|roadmap.*help|create.*roadmap|generate.*roadmap/
+      'roadmap_creator'
     else
       nil
     end

@@ -70,8 +70,16 @@ class AiAgentService
   end
   
   def create_roadmap(input_data)
-    prompt = build_roadmap_prompt(input_data)
-    call_gemini(prompt)
+    # Use the dedicated Gemini service for roadmap generation
+    gemini_service = GeminiService.new
+    gemini_service.generate_roadmap(
+      input_data[:command] || input_data[:project_goals] || 'No goals specified',
+      {
+        channel_name: input_data[:context]&.dig(:channel_name),
+        user_name: input_data[:context]&.dig(:user_name),
+        participants: input_data[:context]&.dig(:participants)
+      }
+    )
   end
   
   def update_statuses(input_data)

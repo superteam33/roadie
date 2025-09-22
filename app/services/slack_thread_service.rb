@@ -58,7 +58,10 @@ class SlackThreadService
   
   def generate_thread_summary(messages)
     # Create a summary of the thread for context
-    message_texts = messages.map { |msg| "#{msg[:user_info][:name]}: #{msg[:text]}" }
+    message_texts = messages.map do |msg|
+      user_name = msg[:user_info]&.dig(:name) || 'Unknown User'
+      "#{user_name}: #{msg[:text]}"
+    end
     message_texts.join("\n")
   end
   
@@ -75,11 +78,11 @@ class SlackThreadService
         parts = msg[:text].split('@roadie')
         if parts.length > 1
           instruction = parts[1].strip
-          instructions << {
-            instruction: instruction,
-            user: msg[:user_info][:name],
-            timestamp: msg[:timestamp]
-          }
+        instructions << {
+          instruction: instruction,
+          user: msg[:user_info]&.dig(:name) || 'Unknown User',
+          timestamp: msg[:timestamp]
+        }
         end
       end
       
@@ -87,7 +90,7 @@ class SlackThreadService
       if text.match?(/create|generate|build|make|update|status|progress|task|epic|prd|roadmap/)
         instructions << {
           instruction: msg[:text],
-          user: msg[:user_info][:name],
+          user: msg[:user_info]&.dig(:name) || 'Unknown User',
           timestamp: msg[:timestamp],
           type: 'implicit_command'
         }
@@ -139,7 +142,7 @@ class SlackThreadService
   
   def extract_participants(messages)
     participants = messages.map { |msg| msg[:user] }.uniq
-    participants.map { |user_id| get_user_info(user_id) }
+    participants.map { |user_id| get_user_info(user_id) }.compact
   end
   
   def calculate_thread_duration(messages)

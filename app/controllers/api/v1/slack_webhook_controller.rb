@@ -102,8 +102,13 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
   end
   
   def process_direct_mention(event)
-    # Send immediate hello response
-    send_hello_response(event)
+    # Check if this is a roadmap request
+    if event['text'].downcase.include?('roadmap')
+      process_roadmap_request(event)
+    else
+      # Send immediate hello response for other requests
+      send_hello_response(event)
+    end
     
     # Also process through the integration system
     IntegrationWebhookJob.perform_later(
@@ -179,6 +184,121 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
   def handle_view_submission(payload)
     # Handle modal submissions
     render json: { message: 'View submission handled' }
+  end
+  
+  def process_roadmap_request(event)
+    # Send immediate acknowledgment
+    send_roadmap_acknowledgment(event)
+    
+    # Generate roadmap using Gemini
+    begin
+      gemini_service = GeminiService.new
+      roadmap = gemini_service.generate_roadmap(
+        event['text'],
+        {
+          channel_name: get_channel_name(event['channel']),
+          user_name: get_user_info(event['user'])[:name],
+          participants: [get_user_info(event['user'])]
+        }
+      )
+      
+      # Post the roadmap back to the thread
+      send_roadmap_response(event, roadmap)
+    rescue => e
+      Rails.logger.error "Error generating roadmap: #{e.message}"
+      send_error_response(event, "Sorry, I couldn't generate the roadmap. Error: #{e.message}")
+    end
+  end
+  
+  def send_roadmap_acknowledgment(event)
+    slack_client = Slack::Web::Client.new(token: ENV['SLACK_BOT_TOKEN'])
+    
+    begin
+      slack_client.chat_postMessage(
+        channel: event['channel'],
+        text: "🗺️ Generating your roadmap... This might take a moment!",
+        thread_ts: event['ts']
+      )
+    rescue Slack::Web::Api::Errors::SlackError => e
+      Rails.logger.error "Error sending roadmap acknowledgment: #{e.message}"
+    end
+  end
+  
+  def send_roadmap_response(event, roadmap)
+    slack_client = Slack::Web::Client.new(token: ENV['SLACK_BOT_TOKEN'])
+    
+    begin
+      # Split long messages if needed (Slack has a 4000 character limit)
+      if roadmap[:error]
+        text = "❌ #{roadmap[:error]}"
+      else
+        text = roadmap.to_s
+        if text.length > 3000
+          # Split into chunks
+          chunks = text.scan(/.{1,3000}/)
+          chunks.each_with_index do |chunk, index|
+            prefix = index == 0 ? "" : "_(continued...)_\n\n"
+            slack_client.chat_postMessage(
+              channel: event['channel'],
+              text: prefix + chunk,
+              thread_ts: event['ts']
+            )
+          end
+          return
+        end
+      end
+      
+      slack_client.chat_postMessage(
+        channel: event['channel'],
+        text: text,
+        thread_ts: event['ts']
+      )
+    rescue Slack::Web::Api::Errors::SlackError => e
+      Rails.logger.error "Error sending roadmap response: #{e.message}"
+    end
+  end
+  
+  def send_error_response(event, error_message)
+    slack_client = Slack::Web::Client.new(token: ENV['SLACK_BOT_TOKEN'])
+    
+    begin
+      slack_client.chat_postMessage(
+        channel: event['channel'],
+        text: "❌ #{error_message}",
+        thread_ts: event['ts']
+      )
+    rescue Slack::Web::Api::Errors::SlackError => e
+      Rails.logger.error "Error sending error response: #{e.message}"
+    end
+  end
+  
+  # Helpers
+  def get_user_info(user_id)
+    slack_client = Slack::Web::Client.new(token: ENV['SLACK_BOT_TOKEN'])
+    begin
+      response = slack_client.users_info(user: user_id)
+      user = response['user']
+      {
+        id: user['id'],
+        name: user['real_name'] || user['name'],
+        display_name: user.dig('profile', 'display_name') || user['name'],
+        email: user.dig('profile', 'email')
+      }
+    rescue Slack::Web::Api::Errors::SlackError => e
+      Rails.logger.error "Error fetching user info: #{e.message}"
+      { id: user_id, name: 'Unknown User' }
+    end
+  end
+  
+  def get_channel_name(channel_id)
+    slack_client = Slack::Web::Client.new(token: ENV['SLACK_BOT_TOKEN'])
+    begin
+      response = slack_client.conversations_info(channel: channel_id)
+      response.dig('channel', 'name') || channel_id
+    rescue Slack::Web::Api::Errors::SlackError => e
+      Rails.logger.error "Error fetching channel info: #{e.message}"
+      channel_id
+    end
   end
   
   def send_hello_response(event)
