@@ -5,7 +5,7 @@ class AgentExecution < ApplicationRecord
   validates :status, presence: true, inclusion: { in: %w[pending running completed failed] }
   validates :execution_time, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
   
-  enum status: { 
+  enum :status, { 
     pending: 'pending', 
     running: 'running', 
     completed: 'completed', 

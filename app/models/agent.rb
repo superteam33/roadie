@@ -5,14 +5,14 @@ class Agent < ApplicationRecord
   validates :agent_type, presence: true, inclusion: { in: %w[prd_generator task_breaker roadmap_creator status_updater] }
   validates :status, presence: true, inclusion: { in: %w[active inactive maintenance] }
   
-  enum agent_type: { 
+  enum :agent_type, { 
     prd_generator: 'prd_generator', 
     task_breaker: 'task_breaker', 
     roadmap_creator: 'roadmap_creator', 
     status_updater: 'status_updater' 
   }
   
-  enum status: { 
+  enum :status, { 
     active: 'active', 
     inactive: 'inactive', 
     maintenance: 'maintenance' 

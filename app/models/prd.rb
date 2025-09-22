@@ -4,7 +4,7 @@ class Prd < ApplicationRecord
   validates :title, presence: true
   validates :status, presence: true, inclusion: { in: %w[draft review approved rejected] }
   
-  enum status: { 
+  enum :status, { 
     draft: 'draft', 
     review: 'review', 
     approved: 'approved', 

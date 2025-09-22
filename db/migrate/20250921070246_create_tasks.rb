@@ -5,7 +5,7 @@ class CreateTasks < ActiveRecord::Migration[8.0]
       t.text :description
       t.string :status
       t.string :priority
-      t.references :assignee, null: false, foreign_key: true
+      t.references :assignee, null: true, foreign_key: { to_table: :users }
       t.references :epic, null: false, foreign_key: true
       t.references :project, null: false, foreign_key: true
 

@@ -7,7 +7,7 @@ class Task < ApplicationRecord
   validates :status, presence: true, inclusion: { in: %w[todo in_progress review completed cancelled] }
   validates :priority, presence: true, inclusion: { in: %w[low medium high critical] }
   
-  enum status: { 
+  enum :status, { 
     todo: 'todo', 
     in_progress: 'in_progress', 
     review: 'review', 
@@ -15,7 +15,7 @@ class Task < ApplicationRecord
     cancelled: 'cancelled' 
   }
   
-  enum priority: { 
+  enum :priority, { 
     low: 'low', 
     medium: 'medium', 
     high: 'high', 

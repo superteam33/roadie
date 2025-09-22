@@ -49,6 +49,7 @@ JWT_SECRET_KEY=$(openssl rand -hex 32)
 REDIS_URL=redis://localhost:6379/0
 
 # AI Service API Keys
+GEMINI_API_KEY=AIzaSyA_1hsJrZ6U_th_cTrVDM4Q77SMqPOrB-Q
 OPENAI_API_KEY=your_openai_api_key_here
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 

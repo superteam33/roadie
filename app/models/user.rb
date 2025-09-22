@@ -9,7 +9,7 @@ class User < ApplicationRecord
   validates :email, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :role, presence: true, inclusion: { in: %w[admin pm developer student] }
   
-  enum role: { admin: 'admin', pm: 'pm', developer: 'developer', student: 'student' }
+  enum :role, { admin: 'admin', pm: 'pm', developer: 'developer', student: 'student' }
   
   def integration_tokens
     JSON.parse(super || '{}')

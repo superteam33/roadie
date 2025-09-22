@@ -16,7 +16,7 @@ Roadie is an AI-powered agentic project management platform that helps PMs, deve
 - **Database**: PostgreSQL
 - **Background Jobs**: Sidekiq with Redis
 - **Authentication**: JWT-based authentication
-- **AI Integration**: OpenAI API for AI agent processing
+- **AI Integration**: Google Gemini API for AI agent processing (with OpenAI fallback)
 
 ## Prerequisites
 
@@ -55,6 +55,7 @@ JWT_SECRET_KEY=your_jwt_secret_key_here
 REDIS_URL=redis://localhost:6379/0
 
 # AI Service API Keys
+GEMINI_API_KEY=your_gemini_api_key_here
 OPENAI_API_KEY=your_openai_api_key_here
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
