@@ -82,6 +82,15 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
   end
   
   def process_thread_messages(event)
+    # Check if this is a roadmap request
+    if event['text'].downcase.include?('roadmap') || event['text'].downcase.include?('build') || event['text'].downcase.include?('create') || event['text'].downcase.include?('develop')
+      # This is a roadmap request, process it directly
+      process_roadmap_request(event)
+    else
+      # Send hello response for other requests
+      send_hello_response(event)
+    end
+    
     # Get the thread messages
     thread_messages = fetch_thread_messages(event['channel'], event['thread_ts'])
     

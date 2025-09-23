@@ -77,31 +77,36 @@ class GeminiService
   
   def build_roadmap_prompt(request_text, context)
     <<~PROMPT
-      You are Roadie, an expert AI project management assistant. Generate a comprehensive, actionable product roadmap based on the following request:
+      You are Roadie, an expert AI project management assistant. Based on the following request, generate a concise **task breakdown** that can map directly into Jira tickets or GitHub issues.
 
       REQUEST: "#{request_text}"
-
+  
       CONTEXT:
       - Channel: #{context[:channel_name] || 'Unknown'}
       - User: #{context[:user_name] || 'Unknown'}
       - Thread participants: #{context[:participants]&.map { |p| p[:name] }&.join(', ') || 'Unknown'}
+  
+      🔹 Please output a **list of 4–6 independent subtasks** only.  
+      🔹 Each subtask should include:
+        - **Title** (short, actionable, e.g. "Implement OTP verification API")  
+        - **Description** (1–2 lines with details / acceptance criteria)  
+  
+      ⚡ Formatting Rules (Slack-friendly):
+      - Use a numbered list for tasks (1, 2, 3 …)  
+      - Keep each task **crisp and execution-ready** (no fluff, no long paragraphs)  
+      - Avoid project overviews, risks, success metrics, or timelines — just subtasks
+      - Must add acceptance criteria for each task.
+  
+      Example format:
+  
+      1. **Design DB Schema for OTP**  
+         Add `otp_code` and `expiry` fields in `users` table. Ensure expiry logic is enforced.  
+  
+      2. **Implement OTP API Endpoint**  
+         Create `/auth/otp` to send and verify OTP codes with proper error handling.  
 
-      Please create a CRISP and CLEAR product roadmap that includes:
-
-      1. **Project Overview** - Brief description of the project
-      2. **Key Objectives** - 3-5 main goals
-      3. **Timeline** - Realistic phases with durations
-      4. **Milestones** - Specific deliverables and checkpoints
-      5. **Resources Needed** - Team, tools, budget considerations
-      6. **Risk Assessment** - Potential challenges and mitigation strategies
-      7. **Success Metrics** - How to measure progress and success
-
-      Format the response in a clear, structured way that's easy to read in Slack. Use emojis and formatting to make it visually appealing but 
-      make sure it is not too long and it gets correctly formatted for slack. Keep it concise but comprehensive - aim for 50-100 words total.
-
-      Focus on actionable, practical steps that a development team can immediately start working on.
     PROMPT
-  end
+  end  
   
   def format_roadmap_response(content)
     # Clean up the response and ensure proper formatting

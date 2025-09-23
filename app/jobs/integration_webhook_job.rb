@@ -1,5 +1,5 @@
 class IntegrationWebhookJob < ApplicationJob
-  queue_as :default
+  sidekiq_options queue: :default, retry: 2
   
   def perform(integration_type, command, context, user_id)
     user = User.find(user_id)
