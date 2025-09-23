@@ -96,7 +96,8 @@ class GeminiService
       6. **Risk Assessment** - Potential challenges and mitigation strategies
       7. **Success Metrics** - How to measure progress and success
 
-      Format the response in a clear, structured way that's easy to read in Slack. Use emojis and formatting to make it visually appealing. Keep it concise but comprehensive - aim for 50-100 words total.
+      Format the response in a clear, structured way that's easy to read in Slack. Use emojis and formatting to make it visually appealing but 
+      make sure it is not too long and it gets correctly formatted for slack. Keep it concise but comprehensive - aim for 50-100 words total.
 
       Focus on actionable, practical steps that a development team can immediately start working on.
     PROMPT

@@ -187,9 +187,6 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
   end
   
   def process_roadmap_request(event)
-    # Send immediate acknowledgment
-    send_roadmap_acknowledgment(event)
-    
     # Generate roadmap using Gemini
     begin
       gemini_service = GeminiService.new
@@ -202,11 +199,13 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
         }
       )
       
-      # Post the roadmap back to the thread
-      send_roadmap_response(event, roadmap)
+      # Only post the roadmap if it's successful
+      if roadmap && !roadmap[:error]
+        send_roadmap_response(event, roadmap)
+      end
     rescue => e
       Rails.logger.error "Error generating roadmap: #{e.message}"
-      send_error_response(event, "Sorry, I couldn't generate the roadmap. Error: #{e.message}")
+      # Don't post error messages to Slack, just log them
     end
   end
   

@@ -64,8 +64,8 @@ class IntegrationService
         end
       end
       
-      # Post a summary response back to the thread
-      post_thread_summary(thread_data, results)
+      # Only post the final roadmap result, not a summary
+      post_final_roadmap_result(thread_data, results)
       
       { 
         message: "Processed #{instructions.length} instructions from thread",
@@ -189,6 +189,24 @@ class IntegrationService
     }
   end
   
+  def post_final_roadmap_result(thread_data, results)
+    # Only post the final roadmap result, not error messages or summaries
+    slack_thread_service = SlackThreadService.new(@user)
+    
+    # Find the successful roadmap result
+    roadmap_result = results.find { |r| !r.is_a?(Hash) || !r[:error] }
+    
+    if roadmap_result && !roadmap_result.is_a?(Hash)
+      # This is a successful roadmap string
+      slack_thread_service.post_thread_response(
+        thread_data[:channel],
+        thread_data[:thread_ts],
+        roadmap_result
+      )
+    end
+    # Don't post anything if there are only errors
+  end
+
   def post_thread_summary(thread_data, results)
     # Post a summary of agent actions back to the Slack thread
     slack_thread_service = SlackThreadService.new(@user)
