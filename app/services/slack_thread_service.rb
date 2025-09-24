@@ -43,14 +43,21 @@ class SlackThreadService
   end
   
   def post_thread_response(channel, thread_ts, message)
+    Rails.logger.info "post_thread_response called with channel: #{channel}, thread_ts: #{thread_ts}, message length: #{message&.length}"
     begin
-      @slack_client.chat_postMessage(
+      response = @slack_client.chat_postMessage(
         channel: channel,
         text: message,
         thread_ts: thread_ts
       )
+      Rails.logger.info "Successfully posted message to Slack: #{response.inspect}"
+      response
     rescue Slack::Web::Api::Errors::SlackError => e
       Rails.logger.error "Error posting thread response: #{e.message}"
+      Rails.logger.error "Error details: #{e.inspect}"
+    rescue => e
+      Rails.logger.error "Unexpected error posting thread response: #{e.message}"
+      Rails.logger.error "Error details: #{e.inspect}"
     end
   end
   

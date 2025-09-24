@@ -208,9 +208,16 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
         }
       )
       
+      Rails.logger.info "Roadmap generated: #{roadmap.class} - #{roadmap.is_a?(String) ? roadmap[0..100] + '...' : roadmap.inspect}"
+      
       # Only post the roadmap if it's successful
-      if roadmap && !roadmap[:error]
+      if roadmap && !roadmap.is_a?(Hash)
+        Rails.logger.info "Posting roadmap to Slack..."
         send_roadmap_response(event, roadmap)
+      elsif roadmap && roadmap.is_a?(Hash) && roadmap[:error]
+        Rails.logger.error "Roadmap generation failed: #{roadmap[:error]}"
+      else
+        Rails.logger.warn "Roadmap is nil or unexpected format: #{roadmap.inspect}"
       end
     rescue => e
       Rails.logger.error "Error generating roadmap: #{e.message}"
@@ -236,8 +243,10 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
     slack_client = Slack::Web::Client.new(token: ENV['SLACK_BOT_TOKEN'])
     
     begin
+      Rails.logger.info "send_roadmap_response called with roadmap type: #{roadmap.class}"
+      
       # Split long messages if needed (Slack has a 4000 character limit)
-      if roadmap[:error]
+      if roadmap.is_a?(Hash) && roadmap[:error]
         text = "❌ #{roadmap[:error]}"
       else
         text = roadmap.to_s
@@ -246,23 +255,28 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
           chunks = text.scan(/.{1,3000}/)
           chunks.each_with_index do |chunk, index|
             prefix = index == 0 ? "" : "_(continued...)_\n\n"
-            slack_client.chat_postMessage(
+            response = slack_client.chat_postMessage(
               channel: event['channel'],
               text: prefix + chunk,
               thread_ts: event['ts']
             )
+            Rails.logger.info "Posted chunk #{index + 1}/#{chunks.length}: #{response.inspect}"
           end
           return
         end
       end
       
-      slack_client.chat_postMessage(
+      response = slack_client.chat_postMessage(
         channel: event['channel'],
         text: text,
         thread_ts: event['ts']
       )
     rescue Slack::Web::Api::Errors::SlackError => e
       Rails.logger.error "Error sending roadmap response: #{e.message}"
+      Rails.logger.error "Error details: #{e.inspect}"
+    rescue => e
+      Rails.logger.error "Unexpected error sending roadmap response: #{e.message}"
+      Rails.logger.error "Error details: #{e.inspect}"
     end
   end
   

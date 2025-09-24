@@ -193,18 +193,35 @@ class IntegrationService
     # Only post the final roadmap result, not error messages or summaries
     slack_thread_service = SlackThreadService.new(@user)
     
+    Rails.logger.info "post_final_roadmap_result called with results: #{results.inspect}"
+    
     # Find the successful roadmap result
     roadmap_result = results.find { |r| !r.is_a?(Hash) || !r[:error] }
     
-    if roadmap_result && !roadmap_result.is_a?(Hash)
-      # This is a successful roadmap string
-      slack_thread_service.post_thread_response(
-        thread_data[:channel],
-        thread_data[:thread_ts],
-        roadmap_result
-      )
+    Rails.logger.info "Found roadmap_result: #{roadmap_result.inspect}"
+    
+    if roadmap_result
+      # Check if it's a string (successful roadmap) or a hash without error
+      if roadmap_result.is_a?(String)
+        # This is a successful roadmap string
+        Rails.logger.info "Posting roadmap string to Slack: #{roadmap_result[0..100]}..."
+        slack_thread_service.post_thread_response(
+          thread_data[:channel],
+          thread_data[:thread_ts],
+          roadmap_result
+        )
+      elsif roadmap_result.is_a?(Hash) && !roadmap_result[:error]
+        # This is a successful roadmap hash
+        Rails.logger.info "Posting roadmap hash to Slack: #{roadmap_result.inspect}"
+        slack_thread_service.post_thread_response(
+          thread_data[:channel],
+          thread_data[:thread_ts],
+          roadmap_result.to_s
+        )
+      end
+    else
+      Rails.logger.warn "No successful roadmap result found in: #{results.inspect}"
     end
-    # Don't post anything if there are only errors
   end
 
   def post_thread_summary(thread_data, results)
