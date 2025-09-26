@@ -5,13 +5,20 @@ class Api::V1::ApplicationController < ApplicationController
   private
   
   def authenticate_user!
-    token = request.headers['Authorization']&.split(' ')&.last
+    auth_header = request.headers['Authorization']
+    return render_unauthorized unless auth_header
+    
+    # Extract token from "Bearer <token>" format
+    token = auth_header.split(' ').last
     return render_unauthorized unless token
     
     begin
-      decoded_token = JWT.decode(token, jwt_secret, true, algorithm: 'HS256')
-      @current_user = User.find(decoded_token[0]['user_id'])
-    rescue JWT::DecodeError, ActiveRecord::RecordNotFound
+      # Find active session by access token
+      session = UserSession.valid.find_by(access_token: token)
+      return render_unauthorized unless session
+      
+      @current_user = session.user
+    rescue ActiveRecord::RecordNotFound
       render_unauthorized
     end
   end

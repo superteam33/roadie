@@ -1,65 +1,125 @@
-class Api::V1::AuthController < ApplicationController
-  def login
-    user = User.find_by(email: params[:email])
-    
-    if user&.authenticate(params[:password])
-      token = generate_jwt_token(user)
-      render json: {
-        user: UserSerializer.new(user).as_json,
-        token: token
+class Api::V1::AuthController < Api::V1::ApplicationController
+  # Skip authentication for auth endpoints
+  skip_before_action :authenticate_user!, only: [:signup, :login, :public_key]
+  
+  # GET /api/v1/auth/public_key
+  def public_key
+    public_key = RsaService.get_public_key
+    if public_key
+      render json: { 
+        public_key: public_key,
+        message: "Use this public key to encrypt passwords before sending to login/signup endpoints"
       }
     else
-      render json: { error: 'Invalid credentials' }, status: :unauthorized
+      render json: { error: "Public key not available" }, status: :service_unavailable
     end
   end
   
-  def register
-    user = User.new(user_params)
-    
-    if user.save
-      token = generate_jwt_token(user)
-      render json: {
-        user: UserSerializer.new(user).as_json,
-        token: token
-      }, status: :created
-    else
-      render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
-    end
-  end
-  
-  def me
-    token = request.headers['Authorization']&.split(' ')&.last
-    
-    if token
-      begin
-        decoded_token = JWT.decode(token, jwt_secret, true, algorithm: 'HS256')
-        user = User.find(decoded_token[0]['user_id'])
-        render json: { user: UserSerializer.new(user).as_json }
-      rescue JWT::DecodeError, ActiveRecord::RecordNotFound
-        render json: { error: 'Invalid token' }, status: :unauthorized
+  # POST /api/v1/auth/signup
+  def signup
+    begin
+      # Decrypt the password
+      decrypted_password = decrypt_password(params[:encrypted_password])
+      return unless decrypted_password
+      
+      # Create user with decrypted password
+      user = User.new(
+        first_name: params[:first_name],
+        last_name: params[:last_name],
+        email: params[:email],
+        role: params[:role],
+        password: decrypted_password,
+        password_confirmation: decrypted_password
+      )
+      
+      if user.save
+        # Create session
+        session = user.create_session!
+        
+        render json: {
+          message: "User created successfully",
+          user: UserSerializer.new(user).as_json,
+          access_token: session.access_token,
+          expires_at: session.expires_at
+        }, status: :created
+      else
+        render json: {
+          error: "Failed to create user",
+          details: user.errors.full_messages
+        }, status: :unprocessable_entity
       end
-    else
-      render json: { error: 'No token provided' }, status: :unauthorized
+    rescue => e
+      Rails.logger.error "Signup error: #{e.message}"
+      render json: { error: "Internal server error" }, status: :internal_server_error
     end
+  end
+  
+  # POST /api/v1/auth/login
+  def login
+    begin
+      # Decrypt the password
+      decrypted_password = decrypt_password(params[:encrypted_password])
+      return unless decrypted_password
+      
+      # Find user by email
+      user = User.find_by(email: params[:email])
+      
+      if user && user.authenticate(decrypted_password)
+        # Create new session
+        session = user.create_session!
+        
+        render json: {
+          message: "Login successful",
+          user: UserSerializer.new(user).as_json,
+          access_token: session.access_token,
+          expires_at: session.expires_at
+        }
+      else
+        render json: { error: "Invalid email or password" }, status: :unauthorized
+      end
+    rescue => e
+      Rails.logger.error "Login error: #{e.message}"
+      render json: { error: "Internal server error" }, status: :internal_server_error
+    end
+  end
+  
+  # POST /api/v1/auth/logout
+  def logout
+    begin
+      current_user.logout!
+      render json: { message: "Logged out successfully" }
+    rescue => e
+      Rails.logger.error "Logout error: #{e.message}"
+      render json: { error: "Internal server error" }, status: :internal_server_error
+    end
+  end
+  
+  # GET /api/v1/auth/me
+  def me
+    render json: {
+      user: UserSerializer.new(current_user).as_json,
+      session: {
+        access_token: current_user.active_session&.access_token,
+        expires_at: current_user.active_session&.expires_at
+      }
+    }
   end
   
   private
   
-  def user_params
-    params.require(:user).permit(:name, :email, :password, :password_confirmation, :role)
-  end
-  
-  def generate_jwt_token(user)
-    payload = {
-      user_id: user.id,
-      email: user.email,
-      exp: 24.hours.from_now.to_i
-    }
+  def decrypt_password(encrypted_password)
+    private_key = RsaService.get_private_key
+    unless private_key
+      render json: { error: "Server configuration error" }, status: :service_unavailable
+      return nil
+    end
     
-    JWT.encode(payload, jwt_secret, 'HS256')
-  end
-  
-  def jwt_secret
-    ENV['JWT_SECRET_KEY'] || 'default_secret_key'
+    decrypted = RsaService.decrypt(encrypted_password, private_key)
+    unless decrypted
+      render json: { error: "Failed to decrypt password" }, status: :bad_request
+      return nil
+    end
+    
+    decrypted
   end
 end

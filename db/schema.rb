@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_22_174335) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_24_041142) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -91,6 +91,19 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_22_174335) do
     t.index ["project_id"], name: "index_tasks_on_project_id"
   end
 
+  create_table "user_sessions", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "access_token", null: false
+    t.datetime "expires_at", null: false
+    t.boolean "is_active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["access_token"], name: "index_user_sessions_on_access_token", unique: true
+    t.index ["expires_at"], name: "index_user_sessions_on_expires_at"
+    t.index ["user_id", "is_active"], name: "index_user_sessions_on_user_id_and_is_active"
+    t.index ["user_id"], name: "index_user_sessions_on_user_id"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "name"
     t.string "email"
@@ -100,6 +113,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_22_174335) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "slack_user_id"
+    t.string "first_name"
+    t.string "last_name"
     t.index ["email"], name: "index_users_on_email", unique: true
   end
 
@@ -112,4 +127,5 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_22_174335) do
   add_foreign_key "tasks", "epics"
   add_foreign_key "tasks", "projects"
   add_foreign_key "tasks", "users", column: "assignee_id"
+  add_foreign_key "user_sessions", "users"
 end
