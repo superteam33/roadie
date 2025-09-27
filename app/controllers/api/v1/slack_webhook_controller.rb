@@ -1,4 +1,5 @@
 class Api::V1::SlackWebhookController < Api::V1::ApplicationController
+  require_relative '../../../services/openai_service'
   # Skip authentication for webhooks
   skip_before_action :authenticate_user!, only: [:events, :interactive]
   
@@ -51,6 +52,9 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
   private
   
   def handle_event_callback(event)
+    # Skip processing if this is a bot message to prevent infinite loops
+    return render json: { message: 'Bot message ignored' } if event['bot_id'] || event['subtype'] == 'bot_message'
+    
     case event['type']
     when 'app_mention'
       handle_app_mention(event)
@@ -64,6 +68,10 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
   end
   
   def handle_app_mention(event)
+    # Skip if the message is just a mention without any other content
+    text_without_mention = event['text'].gsub(/<@[^>]+>/, '').strip
+    return if text_without_mention.empty?
+    
     # Check if this is a thread reply
     if event['thread_ts']
       # This is a thread reply mentioning @roadie
@@ -78,17 +86,33 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
     # Handle regular messages that might be in threads
     return unless event['thread_ts'] && event['text']&.include?('@roadie')
     
+    # Skip if the message is just a mention without any other content
+    text_without_mention = event['text'].gsub(/<@[^>]+>/, '').strip
+    return if text_without_mention.empty?
+    
     process_thread_messages(event)
   end
   
   def process_thread_messages(event)
-    # Check if this is a roadmap request
-    if event['text'].downcase.include?('roadmap') || event['text'].downcase.include?('build') || event['text'].downcase.include?('create') || event['text'].downcase.include?('develop')
-      # This is a roadmap request, process it directly
+    # Check if this is a roadmap or task creation request
+    text_lower = event['text'].downcase
+    
+    # More specific detection for task creation
+    is_task_creation = text_lower.include?('create task') || text_lower.include?('add task') || 
+                      text_lower.include?('new task') || text_lower.include?('bot create')
+    
+    # More specific detection for roadmap requests
+    is_roadmap = text_lower.include?('roadmap') || text_lower.include?('build') || 
+                text_lower.include?('develop') || text_lower.include?('plan')
+    
+    if is_task_creation || is_roadmap
+      # This is a roadmap or task creation request, process it directly
       process_roadmap_request(event)
     else
-      # Send hello response for other requests
-      send_hello_response(event)
+      # Only send hello response if this is a direct mention, not just any message in thread
+      if event['type'] == 'app_mention'
+        send_hello_response(event)
+      end
     end
     
     # Get the thread messages
@@ -111,8 +135,18 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
   end
   
   def process_direct_mention(event)
-    # Check if this is a roadmap request
-    if event['text'].downcase.include?('roadmap')
+    # Check if this is a roadmap or task creation request
+    text_lower = event['text'].downcase
+    
+    # More specific detection for task creation
+    is_task_creation = text_lower.include?('create task') || text_lower.include?('add task') || 
+                      text_lower.include?('new task') || text_lower.include?('bot create')
+    
+    # More specific detection for roadmap requests
+    is_roadmap = text_lower.include?('roadmap') || text_lower.include?('build') || 
+                text_lower.include?('develop') || text_lower.include?('plan')
+    
+    if is_task_creation || is_roadmap
       process_roadmap_request(event)
     else
       # Send immediate hello response for other requests
@@ -160,8 +194,23 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
   
   def find_user_by_slack_id(slack_user_id)
     # Find user by their Slack ID
-    # You might need to add a slack_user_id field to your User model
-    User.find_by(slack_user_id: slack_user_id) || User.first # Fallback for now
+    user = User.find_by(slack_user_id: slack_user_id)
+    
+    if user
+      Rails.logger.info "Found user by Slack ID: #{user.full_name} (#{user.email})"
+      user
+    else
+      Rails.logger.warn "No user found with Slack ID: #{slack_user_id}, using first user as fallback"
+      # Use the first user as fallback for now
+      fallback_user = User.first
+      if fallback_user
+        Rails.logger.info "Using fallback user: #{fallback_user.full_name} (#{fallback_user.email})"
+        fallback_user
+      else
+        Rails.logger.error "No users found in database!"
+        nil
+      end
+    end
   end
   
   def verify_slack_signature
@@ -196,10 +245,13 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
   end
   
   def process_roadmap_request(event)
-    # Generate roadmap using Gemini
+    # Check rate limiting to prevent infinite loops
+    return if rate_limited?(event)
+    
+    # Generate roadmap using OpenAI
     begin
-      gemini_service = GeminiService.new
-      roadmap = gemini_service.generate_roadmap(
+      openai_service = OpenAIService.new
+      response = openai_service.generate_roadmap(
         event['text'],
         {
           channel_name: get_channel_name(event['channel']),
@@ -208,16 +260,16 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
         }
       )
       
-      Rails.logger.info "Roadmap generated: #{roadmap.class} - #{roadmap.is_a?(String) ? roadmap[0..100] + '...' : roadmap.inspect}"
+      Rails.logger.info "OpenAI response: #{response.class} - #{response.is_a?(String) ? response[0..100] + '...' : response.inspect}"
       
-      # Only post the roadmap if it's successful
-      if roadmap && !roadmap.is_a?(Hash)
-        Rails.logger.info "Posting roadmap to Slack..."
-        send_roadmap_response(event, roadmap)
-      elsif roadmap && roadmap.is_a?(Hash) && roadmap[:error]
-        Rails.logger.error "Roadmap generation failed: #{roadmap[:error]}"
+      # Check if this is a task creation response
+      if response.is_a?(Hash) && (response['tasks'] || response[:tasks])
+        handle_task_creation(event, response)
+      elsif response && response.is_a?(Hash) && response[:error]
+        Rails.logger.error "Task creation failed: #{response[:error]}"
+        send_error_response(event, response[:error])
       else
-        Rails.logger.warn "Roadmap is nil or unexpected format: #{roadmap.inspect}"
+        Rails.logger.warn "Response is nil or unexpected format: #{response.inspect}"
       end
     rescue => e
       Rails.logger.error "Error generating roadmap: #{e.message}"
@@ -336,5 +388,101 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
     rescue Slack::Web::Api::Errors::SlackError => e
       Rails.logger.error "Error sending hello response: #{e.message}"
     end
+  end
+
+  def handle_task_creation(event, task_data)
+    # Find the user who made the request
+    user = find_user_by_slack_id(event['user'])
+    return unless user
+
+    # Create the tasks using TaskCreationService
+    task_service = TaskCreationService.new(user)
+    result = task_service.create_task_from_slack_request(
+      event['text'],
+      {
+        channel_name: get_channel_name(event['channel']),
+        user_name: get_user_info(event['user'])[:name]
+      }
+    )
+
+    # Send response back to Slack
+    if result[:success]
+      tasks = result[:tasks] || result['tasks']
+      send_task_creation_success(event, tasks)
+    else
+      send_task_creation_error(event, result[:error])
+    end
+  end
+
+  def send_task_creation_success(event, tasks)
+    slack_client = Slack::Web::Client.new(token: ENV['SLACK_BOT_TOKEN'])
+    
+    # Format the tasks response in the required JSON format
+    tasks_json = tasks.map do |task|
+      {
+        "title": task[:title],
+        "description": task[:description],
+        "status": task[:status],
+        "priority": task[:priority],
+        "epic_uuid": task[:epic_uuid],
+        "assignee_uuid": task[:assignee_uuid],
+        "due_date": task[:due_date]
+      }
+    end
+
+    begin
+      slack_client.chat_postMessage(
+        channel: event['channel'],
+        text: "✅ #{tasks.length} task(s) created successfully!\n\n```json\n#{JSON.pretty_generate(tasks_json)}\n```",
+        thread_ts: event['ts']
+      )
+    rescue Slack::Web::Api::Errors::SlackError => e
+      Rails.logger.error "Error sending task creation success: #{e.message}"
+    end
+  end
+
+  def send_task_creation_error(event, error_message)
+    slack_client = Slack::Web::Client.new(token: ENV['SLACK_BOT_TOKEN'])
+    
+    begin
+      slack_client.chat_postMessage(
+        channel: event['channel'],
+        text: "❌ Failed to create task: #{error_message}",
+        thread_ts: event['ts']
+      )
+    rescue Slack::Web::Api::Errors::SlackError => e
+      Rails.logger.error "Error sending task creation error: #{e.message}"
+    end
+  end
+
+  def rate_limited?(event)
+    # Create a unique key for this event to prevent duplicate processing
+    event_key = "#{event['channel']}_#{event['user']}_#{event['ts']}"
+    
+    # Check if we've already processed this event in the last 30 seconds
+    cache_key = "slack_event_#{event_key}"
+    
+    if Rails.cache.exist?(cache_key)
+      Rails.logger.info "Rate limiting: Event already processed recently - #{event_key}"
+      return true
+    end
+    
+    # Mark this event as processed for 30 seconds
+    Rails.cache.write(cache_key, true, expires_in: 30.seconds)
+    
+    # Additional check: prevent processing if the message is from a bot
+    if event['bot_id'] || event['subtype'] == 'bot_message'
+      Rails.logger.info "Rate limiting: Ignoring bot message"
+      return true
+    end
+    
+    # Additional check: prevent processing if message is too old (older than 5 minutes)
+    message_time = Time.at(event['ts'].to_f)
+    if message_time < 5.minutes.ago
+      Rails.logger.info "Rate limiting: Message too old - #{message_time}"
+      return true
+    end
+    
+    false
   end
 end

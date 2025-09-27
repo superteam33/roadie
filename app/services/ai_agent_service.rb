@@ -3,9 +3,8 @@ class AiAgentService
   
   def initialize(agent_type)
     @agent_type = agent_type
-    @gemini_api_key = ENV['GEMINI_API_KEY']
-    @openai_api_key = ENV['OPENAI_API_KEY'] # Keep as fallback
-    @anthropic_api_key = ENV['ANTHROPIC_API_KEY'] # Keep as fallback
+    @openai_api_key = ENV['OPEN_AI_API_KEY']
+    raise 'OPEN_AI_API_KEY not found in environment variables' unless @openai_api_key
   end
   
   def execute(input_data, user_id = nil)
@@ -61,18 +60,18 @@ class AiAgentService
   
   def generate_prd(input_data)
     prompt = build_prd_prompt(input_data)
-    call_gemini(prompt)
+    call_openai(prompt)
   end
   
   def break_down_tasks(input_data)
     prompt = build_task_breakdown_prompt(input_data)
-    call_gemini(prompt)
+    call_openai(prompt)
   end
   
   def create_roadmap(input_data)
-    # Use the dedicated Gemini service for roadmap generation
-    gemini_service = GeminiService.new
-    result = gemini_service.generate_roadmap(
+    # Use the dedicated OpenAI service for roadmap generation
+    openai_service = OpenAIService.new
+    result = openai_service.generate_roadmap(
       input_data[:command] || input_data[:project_goals] || 'No goals specified',
       {
         channel_name: input_data[:context]&.dig(:channel_name),
@@ -86,52 +85,9 @@ class AiAgentService
   
   def update_statuses(input_data)
     prompt = build_status_update_prompt(input_data)
-    call_gemini(prompt)
+    call_openai(prompt)
   end
   
-  def call_gemini(prompt)
-    # Try Gemini first
-    if @gemini_api_key.present?
-      call_gemini_api(prompt)
-    elsif @openai_api_key.present?
-      call_openai(prompt)
-    else
-      raise "No AI API key configured. Please set GEMINI_API_KEY or OPENAI_API_KEY"
-    end
-  end
-  
-  def call_gemini_api(prompt)
-    response = HTTParty.post(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=#{@gemini_api_key}",
-      headers: {
-        'Content-Type' => 'application/json'
-      },
-      body: {
-        contents: [{
-          parts: [{
-            text: prompt
-          }]
-        }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 2000,
-          topP: 0.8,
-          topK: 10
-        }
-      }.to_json
-    )
-    
-    if response.success?
-      result = JSON.parse(response.body)
-      if result['candidates'] && result['candidates'][0] && result['candidates'][0]['content']
-        result['candidates'][0]['content']['parts'][0]['text']
-      else
-        raise "Gemini API error: #{result}"
-      end
-    else
-      raise "Gemini API error: #{response.body}"
-    end
-  end
   
   def call_openai(prompt)
     response = HTTParty.post(
@@ -141,7 +97,7 @@ class AiAgentService
         'Content-Type' => 'application/json'
       },
       body: {
-        model: 'gpt-4',
+        model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
         max_tokens: 2000
