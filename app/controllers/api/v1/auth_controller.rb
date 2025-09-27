@@ -1,23 +1,12 @@
 class Api::V1::AuthController < Api::V1::ApplicationController
   # Skip authentication for auth endpoints
-  skip_before_action :authenticate_user!, only: [:signup, :login, :public_key]
+  skip_before_action :authenticate_user!, only: [:signup, :login]
   
-  # GET /api/v1/auth/public_key
-  def public_key
-    public_key = RsaService.get_public_key
-    if public_key
-      render json: { 
-        public_key: public_key,
-        message: "Use this public key to encrypt passwords before sending to login/signup endpoints"
-      }
-    else
-      render json: { error: "Public key not available" }, status: :service_unavailable
-    end
-  end
   
   # POST /api/v1/auth/signup
   def signup
     begin
+      byebug
       # Decrypt the password
       decrypted_password = decrypt_password(params[:encrypted_password])
       return unless decrypted_password
@@ -114,12 +103,17 @@ class Api::V1::AuthController < Api::V1::ApplicationController
       return nil
     end
     
+    Rails.logger.info "Attempting to decrypt password. Length: #{encrypted_password.length}"
+    Rails.logger.info "Encrypted data preview: #{encrypted_password[0..50]}..."
+    
     decrypted = RsaService.decrypt(encrypted_password, private_key)
     unless decrypted
+      Rails.logger.error "Failed to decrypt password with any padding method"
       render json: { error: "Failed to decrypt password" }, status: :bad_request
       return nil
     end
     
+    Rails.logger.info "Password decrypted successfully: #{decrypted}"
     decrypted
   end
 end

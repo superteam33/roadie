@@ -13,14 +13,38 @@ class RsaService
     
     def encrypt(plaintext, public_key_pem)
       public_key = OpenSSL::PKey::RSA.new(public_key_pem)
-      encrypted = public_key.public_encrypt(plaintext)
+      encrypted = public_key.public_encrypt(plaintext, OpenSSL::PKey::RSA::PKCS1_OAEP_PADDING)
       Base64.encode64(encrypted)
     end
     
     def decrypt(encrypted_data, private_key_pem)
       private_key = OpenSSL::PKey::RSA.new(private_key_pem)
       decoded_data = Base64.decode64(encrypted_data)
-      private_key.private_decrypt(decoded_data)
+      
+      # Try different padding methods in order of preference
+      padding_methods = [
+        OpenSSL::PKey::RSA::PKCS1_OAEP_PADDING,
+        OpenSSL::PKey::RSA::PKCS1_PADDING,
+        nil  # Default padding
+      ]
+      
+      padding_methods.each do |padding|
+        begin
+          if padding
+            result = private_key.private_decrypt(decoded_data, padding)
+          else
+            result = private_key.private_decrypt(decoded_data)
+          end
+          Rails.logger.info "RSA decryption successful with padding: #{padding || 'default'}"
+          return result
+        rescue => e
+          Rails.logger.debug "RSA decryption failed with padding #{padding || 'default'}: #{e.message}"
+          next
+        end
+      end
+      
+      Rails.logger.error "RSA decryption failed with all padding methods"
+      nil
     rescue => e
       Rails.logger.error "RSA decryption failed: #{e.message}"
       nil
