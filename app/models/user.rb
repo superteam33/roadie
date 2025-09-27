@@ -1,4 +1,6 @@
 class User < ApplicationRecord
+  include UuidEncodable
+  
   has_secure_password
   
   has_many :owned_projects, class_name: 'Project', foreign_key: 'owner_id'

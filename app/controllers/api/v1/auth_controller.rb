@@ -1,22 +1,27 @@
 class Api::V1::AuthController < Api::V1::ApplicationController
   # Skip authentication for auth endpoints
   skip_before_action :authenticate_user!, only: [:signup, :login]
+  # Skip UUID middleware for auth endpoints since they don't use UUIDs
+  skip_before_action :decode_uuid_params, only: [:signup, :login]
+  skip_after_action :encode_response_ids, only: [:signup, :login]
   
   
   # POST /api/v1/auth/signup
   def signup
     begin
-      byebug
+      # Get auth parameters
+      auth_params = params[:auth] || params
+      
       # Decrypt the password
-      decrypted_password = decrypt_password(params[:encrypted_password])
+      decrypted_password = decrypt_password(auth_params[:encrypted_password])
       return unless decrypted_password
       
       # Create user with decrypted password
       user = User.new(
-        first_name: params[:first_name],
-        last_name: params[:last_name],
-        email: params[:email],
-        role: params[:role],
+        first_name: auth_params[:first_name],
+        last_name: auth_params[:last_name],
+        email: auth_params[:email],
+        role: auth_params[:role],
         password: decrypted_password,
         password_confirmation: decrypted_password
       )
@@ -46,12 +51,15 @@ class Api::V1::AuthController < Api::V1::ApplicationController
   # POST /api/v1/auth/login
   def login
     begin
+      # Get auth parameters
+      auth_params = params[:auth] || params
+      
       # Decrypt the password
-      decrypted_password = decrypt_password(params[:encrypted_password])
+      decrypted_password = decrypt_password(auth_params[:encrypted_password])
       return unless decrypted_password
       
       # Find user by email
-      user = User.find_by(email: params[:email])
+      user = User.find_by(email: auth_params[:email])
       
       if user && user.authenticate(decrypted_password)
         # Create new session

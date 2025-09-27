@@ -1,4 +1,6 @@
 class Task < ApplicationRecord
+  include UuidEncodable
+  
   belongs_to :assignee, class_name: 'User', optional: true
   belongs_to :epic, optional: true
   belongs_to :project

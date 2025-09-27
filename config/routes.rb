@@ -20,6 +20,9 @@ Rails.application.routes.draw do
         resources :tasks
         resources :prds
         resources :roadmaps
+        
+        # Kanban board endpoint
+        get 'kanban', to: 'tasks#kanban'
       end
       
       resources :tasks

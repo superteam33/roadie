@@ -1,4 +1,6 @@
 class Project < ApplicationRecord
+  include UuidEncodable
+  
   belongs_to :owner, class_name: 'User'
   has_many :epics, dependent: :destroy
   has_many :tasks, dependent: :destroy
@@ -8,7 +10,7 @@ class Project < ApplicationRecord
   validates :name, presence: true
   validates :status, presence: true, inclusion: { in: %w[planning active on_hold completed cancelled] }
   
-  enum status: { 
+  enum :status, { 
     planning: 'planning', 
     active: 'active', 
     on_hold: 'on_hold', 

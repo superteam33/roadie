@@ -9,6 +9,30 @@ class Api::V1::TasksController < Api::V1::ApplicationController
     render_paginated_response(tasks, TaskSerializer)
   end
   
+  # Kanban board endpoint - get all tasks for a specific project
+  def kanban
+    project = current_user.owned_projects.find(params[:project_id])
+    tasks = project.tasks.includes(:epic, :assignee)
+    
+    # Group tasks by status for Kanban columns
+    kanban_data = {
+      todo: tasks.where(status: 'todo').order(:priority, :created_at),
+      in_progress: tasks.where(status: 'in_progress').order(:priority, :created_at),
+      review: tasks.where(status: 'review').order(:priority, :created_at),
+      completed: tasks.where(status: 'completed').order(:updated_at)
+    }
+    
+    # Serialize each group
+    serialized_data = kanban_data.transform_values do |task_group|
+      TaskSerializer.new(task_group).as_json
+    end
+    
+    render json: { 
+      data: serialized_data,
+      project: ProjectSerializer.new(project).as_json
+    }
+  end
+  
   def show
     render json: { data: TaskSerializer.new(@task).as_json }
   end
@@ -44,6 +68,6 @@ class Api::V1::TasksController < Api::V1::ApplicationController
   end
   
   def task_params
-    params.require(:task).permit(:title, :description, :status, :priority, :assignee_id, :epic_id, :project_id)
+    params.require(:task).permit(:title, :description, :status, :priority, :assignee_id, :epic_id, :project_id, :due_date)
   end
 end

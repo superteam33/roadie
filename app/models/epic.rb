@@ -1,4 +1,6 @@
 class Epic < ApplicationRecord
+  include UuidEncodable
+  
   belongs_to :project
   has_many :tasks, dependent: :destroy
   
@@ -6,7 +8,7 @@ class Epic < ApplicationRecord
   validates :status, presence: true, inclusion: { in: %w[backlog in_progress review completed cancelled] }
   validates :priority, presence: true, inclusion: { in: %w[low medium high critical] }
   
-  enum status: { 
+  enum :status, { 
     backlog: 'backlog', 
     in_progress: 'in_progress', 
     review: 'review', 
@@ -14,7 +16,7 @@ class Epic < ApplicationRecord
     cancelled: 'cancelled' 
   }
   
-  enum priority: { 
+  enum :priority, { 
     low: 'low', 
     medium: 'medium', 
     high: 'high', 
