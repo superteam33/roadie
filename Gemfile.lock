@@ -413,6 +413,8 @@ DEPENDENCIES
   jwt
   kamal
   kaminari
+  mail
+  net-imap
   pg (~> 1.1)
   puma (>= 5.0)
   rack-cors

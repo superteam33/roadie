@@ -36,6 +36,10 @@ gem "slack-ruby-client"
 # Environment variables
 gem "dotenv-rails"
 
+# Email processing
+gem "mail"
+gem "net-imap"
+
 # CORS handling
 gem "rack-cors"
 

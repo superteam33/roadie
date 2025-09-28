@@ -39,6 +39,9 @@ Rails.application.routes.draw do
       # Slack Webhooks
       post 'slack/events', to: 'slack_webhook#events'
       post 'slack/interactive', to: 'slack_webhook#interactive'
+      
+      # Email processing (for testing only)
+      post 'email/test', to: 'email#test_email_parsing'
     end
   end
 
