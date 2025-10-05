@@ -105,9 +105,9 @@ class TaskCreationService
   private
 
   def parse_task_request(request_text, context)
-    # Use OpenAI to parse the task request
-    openai_service = OpenAIService.new
-    parsed_data = openai_service.generate_roadmap(request_text, context)
+    # Use AI service factory to parse the task request
+    ai_service = AiServiceFactory.create_service
+    parsed_data = ai_service.generate_roadmap(request_text, context)
     
     return nil unless parsed_data && parsed_data.is_a?(Hash)
     

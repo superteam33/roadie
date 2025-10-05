@@ -109,6 +109,7 @@ GEM
     erubi (1.13.1)
     et-orbi (1.3.0)
       tzinfo
+    event_stream_parser (1.0.0)
     factory_bot (6.5.5)
       activesupport (>= 6.1.0)
     factory_bot_rails (6.5.1)
@@ -134,6 +135,11 @@ GEM
       ostruct
     globalid (1.2.1)
       activesupport (>= 6.1)
+    groq (0.3.2)
+      activesupport (> 5)
+      event_stream_parser (~> 1.0)
+      faraday (>= 1.10.0)
+      json
     hashie (5.0.0)
     httparty (0.23.1)
       csv
@@ -152,6 +158,8 @@ GEM
       bigdecimal (~> 3.1)
     jsonapi-serializer (2.2.0)
       activesupport (>= 4.2)
+    jsonrpc (0.9.4)
+      addressable
     jwt (3.1.2)
       base64
     kamal (2.7.0)
@@ -408,8 +416,10 @@ DEPENDENCIES
   dotenv-rails
   factory_bot_rails
   faker
+  groq
   httparty
   jsonapi-serializer
+  jsonrpc
   jwt
   kamal
   kaminari

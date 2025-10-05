@@ -69,9 +69,9 @@ class AiAgentService
   end
   
   def create_roadmap(input_data)
-    # Use the dedicated OpenAI service for roadmap generation
-    openai_service = OpenAIService.new
-    result = openai_service.generate_roadmap(
+    # Use the AI service factory to get the configured service
+    ai_service = AiServiceFactory.create_service
+    result = ai_service.generate_roadmap(
       input_data[:command] || input_data[:project_goals] || 'No goals specified',
       {
         channel_name: input_data[:context]&.dig(:channel_name),
@@ -90,24 +90,22 @@ class AiAgentService
   
   
   def call_openai(prompt)
-    response = HTTParty.post(
-      'https://api.openai.com/v1/chat/completions',
-      headers: {
-        'Authorization' => "Bearer #{@openai_api_key}",
-        'Content-Type' => 'application/json'
-      },
-      body: {
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-        max_tokens: 2000
-      }.to_json
-    )
+    # Use the AI service factory to get the configured service
+    ai_service = AiServiceFactory.create_service
     
-    if response.success?
-      JSON.parse(response.body)['choices'][0]['message']['content']
+    # For backward compatibility, we'll use the service's task creation method
+    # which handles the API calls internally
+    result = ai_service.generate_roadmap(prompt, {})
+    
+    # Extract the content from the result
+    if result.is_a?(Hash) && result[:tasks]
+      # If it's a task creation response, return a formatted string
+      result[:tasks].map { |task| "#{task['title']}: #{task['description']}" }.join("\n")
+    elsif result.is_a?(Hash) && result[:error]
+      raise "AI service error: #{result[:error]}"
     else
-      raise "OpenAI API error: #{response.body}"
+      # If it's a string response, return as is
+      result.to_s
     end
   end
   

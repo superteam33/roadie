@@ -248,10 +248,10 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
     # Check rate limiting to prevent infinite loops
     return if rate_limited?(event)
     
-    # Generate roadmap using OpenAI
+    # Generate roadmap using AI service factory
     begin
-      openai_service = OpenAIService.new
-      response = openai_service.generate_roadmap(
+      ai_service = AiServiceFactory.create_service
+      response = ai_service.generate_roadmap(
         event['text'],
         {
           channel_name: get_channel_name(event['channel']),

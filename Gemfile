@@ -30,6 +30,9 @@ gem "redis"
 # HTTP client for AI integrations
 gem "httparty"
 
+# Groq AI service
+gem "groq"
+
 # Slack API client
 gem "slack-ruby-client"
 
@@ -39,6 +42,10 @@ gem "dotenv-rails"
 # Email processing
 gem "mail"
 gem "net-imap"
+
+# MCP Server
+# gem "mcp-server-sdk"  # Temporarily commented out - not available on rubygems
+gem "jsonrpc"
 
 # CORS handling
 gem "rack-cors"
