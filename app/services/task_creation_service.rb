@@ -148,7 +148,7 @@ class TaskCreationService
       end
     end
 
-    Task.create!(
+    task = Task.create!(
       title: task_data['title'],
       description: task_data['description'],
       status: task_data['status'] || 'todo',
@@ -158,6 +158,20 @@ class TaskCreationService
       assignee: assignee,
       due_date: due_date
     )
+
+    # Automatically create GitHub issue if project is linked to GitHub
+    if task.persisted? && project.github_project_mapping.present?
+      begin
+        github_service = GithubService.new(@user)
+        github_service.create_task(task)
+        Rails.logger.info "✅ Task #{task.id} automatically created in GitHub"
+      rescue => e
+        Rails.logger.error "❌ Failed to create GitHub issue for task #{task.id}: #{e.message}"
+        # Don't fail the task creation if GitHub fails
+      end
+    end
+
+    task
   end
 
   def create_task(task_data, project, epic, assignee)
@@ -255,7 +269,7 @@ class TaskCreationService
     # Enhance description with email context
     enhanced_description = build_enhanced_description(task_data, email_context)
 
-    Task.create!(
+    task = Task.create!(
       title: task_data['title'],
       description: enhanced_description,
       status: task_data['status'] || 'todo',
@@ -265,6 +279,20 @@ class TaskCreationService
       assignee: assignee,
       due_date: due_date
     )
+
+    # Automatically create GitHub issue if project is linked to GitHub
+    if task.persisted? && project.github_project_mapping.present?
+      begin
+        github_service = GithubService.new(@user)
+        github_service.create_task(task)
+        Rails.logger.info "✅ Task #{task.id} automatically created in GitHub from email"
+      rescue => e
+        Rails.logger.error "❌ Failed to create GitHub issue for task #{task.id}: #{e.message}"
+        # Don't fail the task creation if GitHub fails
+      end
+    end
+
+    task
   end
 
   def build_enhanced_description(task_data, email_context)

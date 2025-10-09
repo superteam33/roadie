@@ -40,6 +40,29 @@ Rails.application.routes.draw do
       post 'slack/events', to: 'slack_webhook#events'
       post 'slack/interactive', to: 'slack_webhook#interactive'
       
+      # GitHub Integration
+      get 'github/connect', to: 'github#connect'
+      get 'github/callback', to: 'github#callback'
+      delete 'github/disconnect', to: 'github#disconnect'
+      get 'github/status', to: 'github#status'
+      
+      # GitHub Projects
+      get 'github/projects', to: 'github#list_projects'
+      post 'github/projects/link', to: 'github#link_project'
+      delete 'github/projects/unlink/:project_id', to: 'github#unlink_project'
+      post 'github/projects/:project_id/sync', to: 'github#sync_project'
+      
+      # GitHub Tasks
+      post 'github/tasks/create', to: 'github#create_task'
+      patch 'github/tasks/:task_id/sync', to: 'github#sync_task'
+      get 'github/tasks/:task_id/pull', to: 'github#pull_task'
+      
+      # GitHub Repositories
+      get 'github/repositories', to: 'github#list_repositories'
+      
+      # GitHub Webhooks
+      post 'github/webhook', to: 'github#webhook'
+      
       # Email processing (for testing only)
       post 'email/test', to: 'email#test_email_parsing'
     end

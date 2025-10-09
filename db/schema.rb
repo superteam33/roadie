@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_27_055911) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_08_045431) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -45,6 +45,30 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_27_055911) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["project_id"], name: "index_epics_on_project_id"
+  end
+
+  create_table "github_project_mappings", force: :cascade do |t|
+    t.bigint "project_id", null: false
+    t.string "github_project_id"
+    t.integer "github_project_number", null: false
+    t.string "github_repo_name", null: false
+    t.string "github_org_name", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["github_project_id"], name: "index_github_project_mappings_on_github_project_id", unique: true
+    t.index ["project_id"], name: "index_github_project_mappings_on_project_id", unique: true
+  end
+
+  create_table "github_task_mappings", force: :cascade do |t|
+    t.bigint "task_id", null: false
+    t.string "github_issue_id", null: false
+    t.string "github_project_item_id"
+    t.integer "github_issue_number", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["github_issue_id"], name: "index_github_task_mappings_on_github_issue_id", unique: true
+    t.index ["github_issue_number"], name: "index_github_task_mappings_on_github_issue_number"
+    t.index ["task_id"], name: "index_github_task_mappings_on_task_id", unique: true
   end
 
   create_table "prds", force: :cascade do |t|
@@ -116,12 +140,18 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_27_055911) do
     t.string "slack_user_id"
     t.string "first_name"
     t.string "last_name"
+    t.text "github_access_token"
+    t.string "github_username"
+    t.string "github_oauth_state"
     t.index ["email"], name: "index_users_on_email", unique: true
+    t.index ["github_username"], name: "index_users_on_github_username", unique: true
   end
 
   add_foreign_key "agent_executions", "agents"
   add_foreign_key "agent_executions", "users"
   add_foreign_key "epics", "projects"
+  add_foreign_key "github_project_mappings", "projects"
+  add_foreign_key "github_task_mappings", "tasks"
   add_foreign_key "prds", "projects"
   add_foreign_key "projects", "users", column: "owner_id"
   add_foreign_key "roadmaps", "projects"

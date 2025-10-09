@@ -16,6 +16,9 @@ class User < ApplicationRecord
   # Slack integration fields
   validates :slack_user_id, uniqueness: true, allow_nil: true
   
+  # GitHub integration fields
+  validates :github_username, uniqueness: true, allow_nil: true
+  
   enum :role, { admin: 'admin', manager: 'manager', member: 'member' }
   
   # Virtual attribute for full name

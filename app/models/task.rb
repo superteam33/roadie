@@ -4,6 +4,7 @@ class Task < ApplicationRecord
   belongs_to :assignee, class_name: 'User', optional: true
   belongs_to :epic, optional: true
   belongs_to :project
+  has_one :github_task_mapping, dependent: :destroy
   
   validates :title, presence: true
   validates :status, presence: true, inclusion: { in: %w[todo in_progress review completed cancelled] }

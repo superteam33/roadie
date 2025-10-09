@@ -36,6 +36,10 @@ gem "groq"
 # Slack API client
 gem "slack-ruby-client"
 
+# GitHub API client
+gem "octokit", "~> 6.0"
+gem "faraday-retry", "~> 2.0"
+
 # Environment variables
 gem "dotenv-rails"
 

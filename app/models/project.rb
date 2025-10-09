@@ -6,6 +6,7 @@ class Project < ApplicationRecord
   has_many :tasks, dependent: :destroy
   has_many :prds, dependent: :destroy
   has_many :roadmaps, dependent: :destroy
+  has_one :github_project_mapping, dependent: :destroy
   
   validates :name, presence: true
   validates :status, presence: true, inclusion: { in: %w[planning active on_hold completed cancelled] }
