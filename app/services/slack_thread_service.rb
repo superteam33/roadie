@@ -60,6 +60,47 @@ class SlackThreadService
       Rails.logger.error "Error details: #{e.inspect}"
     end
   end
+
+  def post_placeholder_message(channel, thread_ts, text = "🤖 Working on it...")
+    Rails.logger.info "Posting placeholder message to channel: #{channel}, thread_ts: #{thread_ts}"
+    begin
+      response = @slack_client.chat_postMessage(
+        channel: channel,
+        text: text,
+        thread_ts: thread_ts
+      )
+      Rails.logger.info "Posted placeholder message: #{response.inspect}"
+      # Return the timestamp of the posted message so we can update it later
+      response['ts']
+    rescue Slack::Web::Api::Errors::SlackError => e
+      Rails.logger.error "Error posting placeholder message: #{e.message}"
+      nil
+    rescue => e
+      Rails.logger.error "Unexpected error posting placeholder: #{e.message}"
+      nil
+    end
+  end
+
+  def update_message(channel, message_ts, new_text)
+    Rails.logger.info "Updating message in channel: #{channel}, ts: #{message_ts}"
+    begin
+      response = @slack_client.chat_update(
+        channel: channel,
+        ts: message_ts,
+        text: new_text
+      )
+      Rails.logger.info "Successfully updated message: #{response.inspect}"
+      response
+    rescue Slack::Web::Api::Errors::SlackError => e
+      Rails.logger.error "Error updating message: #{e.message}"
+      Rails.logger.error "Error details: #{e.inspect}"
+      nil
+    rescue => e
+      Rails.logger.error "Unexpected error updating message: #{e.message}"
+      Rails.logger.error "Error details: #{e.inspect}"
+      nil
+    end
+  end
   
   private
   

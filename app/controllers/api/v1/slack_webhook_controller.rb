@@ -395,7 +395,23 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
     user = find_user_by_slack_id(event['user'])
     return unless user
 
-    # Create the tasks using TaskCreationService
+    # Initialize Slack client and thread service
+    slack_client = Slack::Web::Client.new(token: ENV['SLACK_BOT_TOKEN'])
+    slack_service = SlackThreadService.new(user)
+    
+    # Post initial placeholder message
+    placeholder_ts = slack_service.post_placeholder_message(
+      event['channel'],
+      event['ts'],
+      "🤖 *Analyzing your request and creating tasks...*\n\n_Processing..._"
+    )
+    
+    return unless placeholder_ts # Exit if we couldn't post the placeholder
+
+    # Build the progress message that we'll update
+    progress_lines = ["🤖 *Creating tasks from your request...*\n"]
+    
+    # Create the tasks using TaskCreationService with progress callback
     task_service = TaskCreationService.new(user)
     result = task_service.create_task_from_slack_request(
       event['text'],
@@ -403,15 +419,56 @@ class Api::V1::SlackWebhookController < Api::V1::ApplicationController
         channel_name: get_channel_name(event['channel']),
         user_name: get_user_info(event['user'])[:name]
       }
-    )
+    ) do |progress|
+      # This callback is called after each task is created
+      task_line = "\n✅ *Task #{progress[:index]}/#{progress[:total]}:* #{progress[:task_title]}"
+      progress_lines << task_line
+      
+      # Update the Slack message with the current progress
+      slack_service.update_message(
+        event['channel'],
+        placeholder_ts,
+        progress_lines.join("\n")
+      )
+      
+      # Small delay to make the updates visible (optional, can be removed for faster updates)
+      sleep(0.3)
+    end
 
-    # Send response back to Slack
+    # Final message update with complete summary
     if result[:success]
       tasks = result[:tasks] || result['tasks']
-      send_task_creation_success(event, tasks)
+      final_message = build_final_task_summary(tasks, progress_lines)
+      slack_service.update_message(
+        event['channel'],
+        placeholder_ts,
+        final_message
+      )
     else
-      send_task_creation_error(event, result[:error])
+      error_message = "🤖 *Task creation process*\n\n❌ *Error:* #{result[:error]}"
+      slack_service.update_message(
+        event['channel'],
+        placeholder_ts,
+        error_message
+      )
     end
+  end
+
+  def build_final_task_summary(tasks, progress_lines)
+    # Build a nice summary with all created tasks
+    summary = ["🎉 *Successfully created #{tasks.length} task(s)!*\n"]
+    
+    tasks.each_with_index do |task, index|
+      summary << "\n*#{index + 1}. #{task[:title]}*"
+      summary << "   📝 #{task[:description][0..100]}#{'...' if task[:description].length > 100}"
+      summary << "   🎯 Priority: #{task[:priority]} | Status: #{task[:status]}"
+      if task[:assignee_uuid]
+        summary << "   👤 Assigned"
+      end
+    end
+    
+    summary << "\n\n✨ _All tasks have been added to your project!_"
+    summary.join("\n")
   end
 
   def send_task_creation_success(event, tasks)

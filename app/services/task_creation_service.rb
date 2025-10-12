@@ -3,7 +3,7 @@ class TaskCreationService
     @user = user
   end
 
-  def create_task_from_slack_request(request_text, context = {})
+  def create_task_from_slack_request(request_text, context = {}, &progress_callback)
     # Parse the request to extract task details using OpenAI
     response_data = parse_task_request(request_text, context)
     
@@ -18,7 +18,7 @@ class TaskCreationService
     created_tasks = []
     errors = []
 
-    response_data[:tasks].each do |task_data|
+    response_data[:tasks].each_with_index do |task_data, index|
       begin
         # Find epic and assignee for this task
         epic = find_epic(task_data['epic_name'], project) if task_data['epic_name'].present?
@@ -31,7 +31,19 @@ class TaskCreationService
         task = create_task_from_data(task_data, project, epic, assignee)
         
         if task.persisted?
-          created_tasks << format_task_response(task)
+          task_response = format_task_response(task)
+          created_tasks << task_response
+          
+          # Call progress callback if provided
+          if progress_callback
+            progress_callback.call({
+              index: index + 1,
+              total: response_data[:tasks].length,
+              task: task_response,
+              task_title: task.title,
+              task_description: task.description
+            })
+          end
         else
           errors << "Failed to create task '#{task_data['title']}': #{task.errors.full_messages.join(', ')}"
         end
